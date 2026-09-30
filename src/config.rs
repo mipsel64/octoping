@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, path::Path};
+use std::{collections::HashMap, net::SocketAddr, path::Path, time::Duration};
 
 use config::{Environment, File, FileFormat};
 use serde::Deserialize;
@@ -17,9 +17,18 @@ pub struct Config {
     pub listen: SocketAddr,
     pub secret: String,
     #[serde(default)]
+    pub hot_reload: HotReload,
+    #[serde(default)]
     pub users: Users,
     pub upstreams: HashMap<String, upstream::Config>,
     pub events: HashMap<String, Route>,
+}
+
+#[derive(Clone, Copy, Default, Deserialize)]
+pub struct HotReload {
+    /// How often to re-read the config file, e.g. `500ms` or `10s`; unset disables hot reload.
+    #[serde(default, with = "humantime_serde")]
+    pub interval: Option<Duration>,
 }
 
 #[derive(Deserialize)]
@@ -33,14 +42,17 @@ pub struct Route {
 }
 
 impl Config {
-    /// Reads YAML from `path`, expanding `$VAR`/`${VAR}` (unset vars are left as is);
-    /// `OCTOPING__<PATH>` env vars then override scalar values, e.g. `OCTOPING__UPSTREAMS__DEV__URL`.
-    pub fn load(path: &Path) -> Result<Self> {
-        let text = std::fs::read_to_string(path).map_err(|source| Error::ReadConfig {
+    pub fn read(path: &Path) -> Result<String> {
+        std::fs::read_to_string(path).map_err(|source| Error::ReadConfig {
             path: path.into(),
             source,
-        })?;
-        let config = Self::from_yaml(&text)?;
+        })
+    }
+
+    /// Parses YAML after expanding `$VAR`/`${VAR}` (unset vars are left as is);
+    /// `OCTOPING__<PATH>` env vars then override scalar values, e.g. `OCTOPING__UPSTREAMS__DEV__URL`.
+    pub fn parse(text: &str) -> Result<Self> {
+        let config = Self::from_yaml(text)?;
         config.validate()?;
         Ok(config)
     }
@@ -50,6 +62,11 @@ impl Config {
         if self.secret.is_empty() || self.secret.contains('$') {
             return Err(Error::InvalidConfig(
                 "secret must be set and not contain `$`".into(),
+            ));
+        }
+        if self.hot_reload.interval.is_some_and(|i| i.is_zero()) {
+            return Err(Error::InvalidConfig(
+                "hot_reload.interval must be positive".into(),
             ));
         }
         Ok(())
@@ -83,5 +100,12 @@ mod tests {
         let home = std::env::var("HOME").unwrap();
         assert_eq!(config.secret, format!("{home}-${{OCTOPING_TEST_UNSET}}"));
         assert!(config.validate().is_err());
+
+        let yaml = "secret: s\nhot_reload: { interval: 0s }\nupstreams: {}\nevents: {}\n";
+        assert!(Config::parse(yaml).is_err());
+        let config = Config::parse(&yaml.replace("0s", "500ms")).unwrap();
+        assert_eq!(config.hot_reload.interval, Some(Duration::from_millis(500)));
+        let config = Config::parse(&yaml.replace("hot_reload: { interval: 0s }\n", "")).unwrap();
+        assert_eq!(config.hot_reload.interval, None);
     }
 }

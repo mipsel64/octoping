@@ -3,6 +3,7 @@ mod config;
 mod error;
 mod event;
 mod logger;
+mod reload;
 mod server;
 mod template;
 mod upstream;
@@ -10,7 +11,10 @@ mod upstream;
 use std::{path::PathBuf, process::ExitCode};
 
 use clap::Parser;
-use tokio::net::TcpListener;
+use tokio::{
+    net::TcpListener,
+    signal::unix::{SignalKind, signal},
+};
 use tracing::info;
 
 use crate::{app::App, config::Config, error::Result};
@@ -42,13 +46,26 @@ async fn main() -> ExitCode {
 }
 
 async fn run(cli: Cli) -> Result<()> {
-    let config = Config::load(&cli.config)?;
-    let listen = config.listen;
-    let secret = config.secret.clone();
-    let app = App::new(config)?;
+    let text = Config::read(&cli.config)?;
+    let app = App::new(Config::parse(&text)?)?;
+    let listen = app.listen;
+    let shared = reload::shared(app);
+    tokio::spawn(reload::watch(cli.config, text, shared.clone()));
+    let mut term = signal(SignalKind::terminate())?;
+    let mut int = signal(SignalKind::interrupt())?;
     let listener = TcpListener::bind(listen).await?;
     info!(%listen, "octoping listening");
-    axum::serve(listener, server::router(app, secret)).await?;
+    // Graceful: SIGTERM (k8s pod stop) or Ctrl-C lets in-flight deliveries finish.
+    let shutdown = async move {
+        tokio::select! {
+            _ = int.recv() => {}
+            _ = term.recv() => {}
+        }
+        info!("shutting down");
+    };
+    axum::serve(listener, server::router(shared))
+        .with_graceful_shutdown(shutdown)
+        .await?;
     Ok(())
 }
 

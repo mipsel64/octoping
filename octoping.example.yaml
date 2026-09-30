@@ -2,6 +2,9 @@
 # Scalar values can also be overridden with OCTOPING__<PATH>, e.g. OCTOPING__LISTEN.
 listen: 0.0.0.0:8080
 secret: ${GITHUB_WEBHOOK_SECRET}
+# Re-read this file every `interval` and apply changes without a restart; omit to disable.
+hot_reload:
+  interval: 10s
 
 # GitHub login (case-insensitive) -> platform user id, used by mention(login).
 users:
