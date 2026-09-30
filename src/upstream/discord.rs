@@ -5,7 +5,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::Upstream;
-use crate::error::Result;
+use crate::{error::Result, template::Mention};
 
 const MAX_CONTENT_CHARS: usize = 2000;
 const MAX_ALLOWED_USERS: usize = 100;
@@ -43,14 +43,16 @@ impl Discord {
     }
 }
 
-#[async_trait]
-impl Upstream for Discord {
+impl Mention for Discord {
     fn mention(&self, login: &str) -> Option<String> {
         self.ids
             .get(&login.to_lowercase())
             .map(|id| format!("<@{id}>"))
     }
+}
 
+#[async_trait]
+impl Upstream for Discord {
     async fn send(&self, text: &str) -> Result<()> {
         // without_url: the webhook URL embeds its token, and errors are echoed back to GitHub.
         let response = self

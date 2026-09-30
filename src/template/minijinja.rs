@@ -3,8 +3,8 @@ use std::sync::Arc;
 use minijinja::{Environment, Value, context};
 use serde_json::Value as Json;
 
-use super::Template;
-use crate::{error::Result, upstream::Upstream};
+use super::{Mention, Template};
+use crate::error::Result;
 
 const NAME: &str = "message";
 
@@ -21,10 +21,10 @@ impl MiniJinja {
 }
 
 impl Template for MiniJinja {
-    fn render(&self, payload: &Json, upstream: Arc<dyn Upstream>) -> Result<String> {
+    fn render(&self, payload: &Json, mention: Arc<dyn Mention>) -> Result<String> {
         // Option: a null or missing login renders as nothing instead of failing the delivery forever.
         let mention = Value::from_function(move |login: Option<&str>| match login {
-            Some(login) => upstream.mention(login).unwrap_or_else(|| login.to_owned()),
+            Some(login) => mention.mention(login).unwrap_or_else(|| login.to_owned()),
             None => String::new(),
         });
         let ctx = context! { mention, ..Value::from_serialize(payload) };
@@ -35,22 +35,15 @@ impl Template for MiniJinja {
 
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
     use serde_json::json;
 
     use super::*;
 
     struct Test;
 
-    #[async_trait]
-    impl Upstream for Test {
+    impl Mention for Test {
         fn mention(&self, login: &str) -> Option<String> {
             (login == "octocat").then(|| "@octo".into())
-        }
-
-        async fn send(&self, text: &str) -> Result<()> {
-            let _ = text;
-            Ok(())
         }
     }
 

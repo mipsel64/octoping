@@ -6,13 +6,11 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 pub use self::discord::Discord;
-use crate::{config::Users, error::Result};
+use crate::{config::Users, error::Result, template::Mention};
 
-/// A chat or delivery backend that receives rendered messages.
+/// A chat or delivery backend that receives rendered messages, mentioning users in its own format.
 #[async_trait]
-pub trait Upstream: Send + Sync {
-    /// Platform-specific mention for a GitHub login, if the user is mapped on this platform.
-    fn mention(&self, login: &str) -> Option<String>;
+pub trait Upstream: Mention {
     async fn send(&self, text: &str) -> Result<()>;
 }
 
