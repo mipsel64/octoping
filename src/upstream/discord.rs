@@ -7,7 +7,7 @@ use serde_json::json;
 use super::Upstream;
 use crate::{error::Result, template::Mention};
 
-const MAX_CONTENT_CHARS: usize = 2000;
+const MAX_CONTENT_LEN: usize = 2000;
 const MAX_ALLOWED_USERS: usize = 100;
 
 #[derive(Deserialize)]
@@ -31,15 +31,14 @@ impl Discord {
     }
 
     fn body(&self, text: &str) -> serde_json::Value {
-        let content: String = text.chars().take(MAX_CONTENT_CHARS).collect();
         // Ping only mapped users the template mentioned; payload text can't ping @everyone, roles or strangers.
         let users: Vec<_> = self
             .ids
             .values()
-            .filter(|id| content.contains(&format!("<@{id}>")))
+            .filter(|id| text.contains(&format!("<@{id}>")))
             .take(MAX_ALLOWED_USERS)
             .collect();
-        json!({ "content": content, "allowed_mentions": { "parse": [], "users": users } })
+        json!({ "content": text, "allowed_mentions": { "parse": [], "users": users } })
     }
 }
 
@@ -53,6 +52,10 @@ impl Mention for Discord {
 
 #[async_trait]
 impl Upstream for Discord {
+    fn max_len(&self) -> usize {
+        MAX_CONTENT_LEN
+    }
+
     async fn send(&self, text: &str) -> Result<()> {
         // without_url: the webhook URL embeds its token, and errors are echoed back to GitHub.
         let response = self
@@ -86,13 +89,6 @@ mod tests {
         assert_eq!(
             body["allowed_mentions"],
             json!({ "parse": [], "users": ["42"] })
-        );
-        assert_eq!(
-            discord.body(&"x".repeat(3000))["content"]
-                .as_str()
-                .unwrap()
-                .len(),
-            MAX_CONTENT_CHARS
         );
     }
 }

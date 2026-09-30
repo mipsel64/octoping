@@ -17,6 +17,8 @@ upstreams:
 # whose payload makes the optional `when` MiniJinja expression truthy.
 # Templates are MiniJinja, rendered against the raw GitHub payload once per
 # upstream, so mention() uses each upstream's format. Empty output skips the message.
+# Messages over an upstream's limit (Discord: 2000) are cut with "…"; slice long
+# fields like PR bodies (`body[:300]`) to keep the cut away from the important part.
 events:
   pr_opened:
     event: pull_request
@@ -25,6 +27,7 @@ events:
     template: |
       {% if not pull_request.draft %}
       🆕 {{ mention(sender.login) }} opened [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
+      {% if pull_request.body %}>>> {{ pull_request.body[:300] }}{% if pull_request.body | length > 300 %}…{% endif %}{% endif %}
       {% endif %}
 
   pr_approved:

@@ -79,7 +79,11 @@ impl App {
             for (upstream_name, upstream) in &route.upstreams {
                 let result = match route.template.render(payload, upstream.clone()) {
                     Ok(text) if text.is_empty() => continue,
-                    Ok(text) => upstream.send(&text).await,
+                    Ok(text) => {
+                        upstream
+                            .send(&upstream::truncate(&text, upstream.max_len()))
+                            .await
+                    }
                     Err(e) => Err(e),
                 };
                 if let Err(e) = result {
@@ -127,6 +131,9 @@ mod tests {
 
         let opened = json!({ "sender": { "login": "x" }, "pull_request": pr, "repository": repo });
         assert!(render(&app, "pr_opened", opened.clone()).starts_with("🆕 x opened"));
+        let mut long = opened.clone();
+        long["pull_request"]["body"] = json!("b".repeat(5000));
+        assert!(render(&app, "pr_opened", long).ends_with(&format!(">>> {}…", "b".repeat(300))));
         let mut draft = opened;
         draft["pull_request"]["draft"] = json!(true);
         assert_eq!(render(&app, "pr_opened", draft), "");
