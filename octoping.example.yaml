@@ -1,0 +1,38 @@
+# Any value can be overridden with an OCTOPING__<PATH> env var, e.g.
+# OCTOPING__SECRET and OCTOPING__UPSTREAMS__DEV__URL. Keep secrets there.
+listen: 0.0.0.0:8080
+secret: ""
+
+# GitHub login (case-insensitive) -> platform user id, used by mention(login).
+users:
+  octocat:
+    discord: "123456789012345678"
+
+upstreams:
+  dev:
+    type: discord
+    url: ""
+
+# Templates are MiniJinja, rendered against the raw GitHub payload once per
+# upstream, so mention() uses each upstream's format. Empty output skips the message.
+events:
+  pr_opened:
+    to: [dev]
+    template: |
+      {% if not pull_request.draft %}
+      🆕 {{ mention(sender.login) }} opened [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
+      {% endif %}
+
+  pr_approved:
+    to: [dev]
+    template: |
+      ✅ {{ mention(review.user.login) }} approved [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) by {{ mention(pull_request.user.login) }}
+
+  # GitHub lists at most 20 commits per push; force-pushes can have none.
+  push_default:
+    to: [dev]
+    template: |
+      {% if commits %}
+      📦 {{ mention(sender.login) }} pushed to `{{ repository.full_name }}:{{ repository.default_branch }}`
+      {% for c in commits[:10] %}- [`{{ c.id[:7] }}`](<{{ c.url }}>) {{ c.message | lines | first }}
+      {% endfor %}{% endif %}

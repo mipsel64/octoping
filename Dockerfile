@@ -10,4 +10,4 @@ FROM gcr.io/distroless/cc-debian13:nonroot
 COPY --from=build /octoping /octoping
 EXPOSE 8080
 ENTRYPOINT ["/octoping"]
-CMD ["/etc/octoping/octoping.toml"]
+CMD ["--config", "/etc/octoping/octoping.yaml"]
