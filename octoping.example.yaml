@@ -15,6 +15,8 @@ upstreams:
   dev:
     type: discord
     url: ${DISCORD_WEBHOOK_URL}
+    # Discord ids are per account, not per server. For someone using another account on this
+    # server, add e.g. `discord-work: "..."` under their login and set `users_key: discord-work`.
 
 # Each event fires on deliveries whose X-GitHub-Event header equals `event` and
 # whose payload makes the optional `when` MiniJinja expression truthy.

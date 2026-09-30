@@ -44,21 +44,53 @@ pub enum Config {
 
 pub fn build(config: Config, users: &Users, http: reqwest::Client) -> Arc<dyn Upstream> {
     match config {
-        Config::Discord(config) => Arc::new(Discord::new(config, ids(users, "discord"), http)),
+        Config::Discord(config) => {
+            let ids = ids(users, config.users_key.as_deref(), "discord");
+            Arc::new(Discord::new(config, ids, http))
+        }
     }
 }
 
-/// Lowercased GitHub login -> user id on `platform`.
-fn ids(users: &Users, platform: &str) -> HashMap<String, String> {
+/// Lowercased GitHub login -> user id under `key`, else under `platform`.
+fn ids(users: &Users, key: Option<&str>, platform: &str) -> HashMap<String, String> {
     users
         .iter()
-        .filter_map(|(login, ids)| Some((login.to_lowercase(), ids.get(platform)?.clone())))
+        .filter_map(|(login, ids)| {
+            let id = key.and_then(|k| ids.get(k)).or_else(|| ids.get(platform))?;
+            Some((login.to_lowercase(), id.clone()))
+        })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ids_prefer_users_key() {
+        let users: Users = HashMap::from([
+            (
+                "Alice".into(),
+                HashMap::from([("discord".into(), "1".into()), ("work".into(), "9".into())]),
+            ),
+            (
+                "bob".into(),
+                HashMap::from([("discord".into(), "2".into())]),
+            ),
+            (
+                "carol".into(),
+                HashMap::from([("slack".into(), "3".into())]),
+            ),
+        ]);
+        let pairs = |key| {
+            let mut v: Vec<_> = ids(&users, key, "discord").into_iter().collect();
+            v.sort();
+            v
+        };
+        let pair = |l: &str, i: &str| (l.to_owned(), i.to_owned());
+        assert_eq!(pairs(None), [pair("alice", "1"), pair("bob", "2")]);
+        assert_eq!(pairs(Some("work")), [pair("alice", "9"), pair("bob", "2")]);
+    }
 
     #[test]
     fn truncates_by_utf16() {
