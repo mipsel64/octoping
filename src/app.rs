@@ -17,6 +17,7 @@ const SEND_TIMEOUT: Duration = Duration::from_secs(8);
 pub struct App {
     pub listen: SocketAddr,
     pub secret: String,
+    pub reload_every: Duration,
     routes: Vec<Route>,
 }
 
@@ -37,6 +38,7 @@ impl App {
         let Config {
             listen,
             secret,
+            reload_secs,
             users,
             upstreams,
             events,
@@ -72,6 +74,7 @@ impl App {
         Ok(Self {
             listen,
             secret,
+            reload_every: Duration::from_secs(reload_secs),
             routes,
         })
     }

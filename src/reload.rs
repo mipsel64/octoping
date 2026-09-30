@@ -1,17 +1,20 @@
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
-    time::Duration,
 };
 
 use tracing::{info, warn};
 
 use crate::{app::App, config::Config, error::Result, server::Shared};
 
-/// Re-reads the config file every `every` and swaps in a new app when its content changes.
+/// Re-reads the config file every `reload_secs` and swaps in a new app when its content changes.
 // Polling, not a file watcher: k8s swaps ConfigMap volumes via a `..data` symlink, which watchers easily miss.
-pub async fn watch(path: PathBuf, mut last: String, shared: Arc<Shared>, every: Duration) {
+pub async fn watch(path: PathBuf, mut last: String, shared: Arc<Shared>) {
     loop {
+        let every = shared
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .reload_every;
         tokio::time::sleep(every).await;
         reload(&path, &mut last, &shared);
     }

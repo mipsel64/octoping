@@ -16,6 +16,9 @@ pub struct Config {
     #[serde(default = "default_listen")]
     pub listen: SocketAddr,
     pub secret: String,
+    /// How often to re-read the config file, in seconds.
+    #[serde(default = "default_reload_secs")]
+    pub reload_secs: u64,
     #[serde(default)]
     pub users: Users,
     pub upstreams: HashMap<String, upstream::Config>,
@@ -55,6 +58,11 @@ impl Config {
                 "secret must be set and not contain `$`".into(),
             ));
         }
+        if self.reload_secs == 0 {
+            return Err(Error::InvalidConfig(
+                "reload_secs must be at least 1".into(),
+            ));
+        }
         Ok(())
     }
 
@@ -69,6 +77,11 @@ impl Config {
             .build()?;
         Ok(config.try_deserialize()?)
     }
+}
+
+// Kubelet refreshes ConfigMap volumes about once a minute, so faster polling rarely helps.
+fn default_reload_secs() -> u64 {
+    10
 }
 
 fn default_listen() -> SocketAddr {
@@ -86,5 +99,9 @@ mod tests {
         let home = std::env::var("HOME").unwrap();
         assert_eq!(config.secret, format!("{home}-${{OCTOPING_TEST_UNSET}}"));
         assert!(config.validate().is_err());
+
+        let yaml = "secret: s\nreload_secs: 0\nupstreams: {}\nevents: {}\n";
+        assert!(Config::parse(yaml).is_err());
+        assert!(Config::parse(&yaml.replace(": 0", ": 1")).is_ok());
     }
 }

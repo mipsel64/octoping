@@ -8,7 +8,7 @@ mod server;
 mod template;
 mod upstream;
 
-use std::{path::PathBuf, process::ExitCode, time::Duration};
+use std::{path::PathBuf, process::ExitCode};
 
 use clap::Parser;
 use tokio::{
@@ -45,20 +45,12 @@ async fn main() -> ExitCode {
     }
 }
 
-/// Kubelet refreshes ConfigMap volumes about once a minute, so polling faster adds nothing.
-const RELOAD_EVERY: Duration = Duration::from_secs(10);
-
 async fn run(cli: Cli) -> Result<()> {
     let text = Config::read(&cli.config)?;
     let app = App::new(Config::parse(&text)?)?;
     let listen = app.listen;
     let shared = reload::shared(app);
-    tokio::spawn(reload::watch(
-        cli.config,
-        text,
-        shared.clone(),
-        RELOAD_EVERY,
-    ));
+    tokio::spawn(reload::watch(cli.config, text, shared.clone()));
     let mut term = signal(SignalKind::terminate())?;
     let mut int = signal(SignalKind::interrupt())?;
     let listener = TcpListener::bind(listen).await?;
