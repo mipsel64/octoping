@@ -13,6 +13,9 @@ const MAX_ALLOWED_USERS: usize = 100;
 #[derive(Deserialize)]
 pub struct Config {
     pub url: String,
+    /// `users` key holding this server's ids, for people with a second Discord account; logins
+    /// without it fall back to `discord`.
+    pub users_key: Option<String>,
 }
 
 pub struct Discord {
@@ -82,7 +85,14 @@ mod tests {
             ("octocat".into(), "42".into()),
             ("other".into(), "7".into()),
         ]);
-        let discord = Discord::new(Config { url: String::new() }, ids, reqwest::Client::new());
+        let discord = Discord::new(
+            Config {
+                url: String::new(),
+                users_key: None,
+            },
+            ids,
+            reqwest::Client::new(),
+        );
         assert_eq!(discord.mention("OctoCat").as_deref(), Some("<@42>"));
         assert_eq!(discord.mention("ghost"), None);
         let body = discord.body("<@42> @everyone <@999>");
