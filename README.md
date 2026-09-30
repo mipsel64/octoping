@@ -15,6 +15,10 @@ The config file expands `$VAR`/`${VAR}` from the environment before YAML parsing
 
 Logging: `--log-level`/`RUST_LOG` (default `info`, per-target like `warn,octoping=debug`) and `--log-format`/`LOG_FORMAT` (`compact` default, `full`, `json`, `pretty`). Each request is logged with its GitHub event and delivery id.
 
+The config file is re-read every 10 s and swapped in when it changes, so templates, events, users and upstreams update without a restart. An invalid file is logged and the previous config kept. `listen` changes, and env vars (including `${VAR}` values), need a restart. SIGTERM finishes in-flight deliveries before exiting.
+
+In Kubernetes, mount the ConfigMap as a directory (not `subPath`, which never updates) and point `--config` at the file in it.
+
 ## GitHub setup
 
 Repo or org → Settings → Webhooks → Add webhook:

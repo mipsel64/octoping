@@ -33,14 +33,17 @@ pub struct Route {
 }
 
 impl Config {
-    /// Reads YAML from `path`, expanding `$VAR`/`${VAR}` (unset vars are left as is);
-    /// `OCTOPING__<PATH>` env vars then override scalar values, e.g. `OCTOPING__UPSTREAMS__DEV__URL`.
-    pub fn load(path: &Path) -> Result<Self> {
-        let text = std::fs::read_to_string(path).map_err(|source| Error::ReadConfig {
+    pub fn read(path: &Path) -> Result<String> {
+        std::fs::read_to_string(path).map_err(|source| Error::ReadConfig {
             path: path.into(),
             source,
-        })?;
-        let config = Self::from_yaml(&text)?;
+        })
+    }
+
+    /// Parses YAML after expanding `$VAR`/`${VAR}` (unset vars are left as is);
+    /// `OCTOPING__<PATH>` env vars then override scalar values, e.g. `OCTOPING__UPSTREAMS__DEV__URL`.
+    pub fn parse(text: &str) -> Result<Self> {
+        let config = Self::from_yaml(text)?;
         config.validate()?;
         Ok(config)
     }

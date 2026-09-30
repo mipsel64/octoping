@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use axum::{
     Router,
@@ -17,12 +17,10 @@ use crate::app::App;
 /// GitHub's maximum webhook payload size.
 const MAX_BODY_BYTES: usize = 25 << 20;
 
-struct Shared {
-    app: App,
-    secret: String,
-}
+/// The running app; swapped in place when the config is reloaded.
+pub type Shared = RwLock<Arc<App>>;
 
-pub fn router(app: App, secret: String) -> Router {
+pub fn router(shared: Arc<Shared>) -> Router {
     Router::new()
         .route("/webhook", post(webhook))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
@@ -31,7 +29,7 @@ pub fn router(app: App, secret: String) -> Router {
                 .make_span_with(request_span)
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
-        .with_state(Arc::new(Shared { app, secret }))
+        .with_state(shared)
 }
 
 fn request_span<B>(request: &Request<B>) -> Span {
@@ -56,8 +54,9 @@ async fn webhook(
     headers: HeaderMap,
     body: Bytes,
 ) -> (StatusCode, String) {
+    let app = shared.read().unwrap_or_else(|e| e.into_inner()).clone();
     let header = |name| headers.get(name).and_then(|v| v.to_str().ok());
-    if !verify(&shared.secret, &body, header("x-hub-signature-256")) {
+    if !verify(&app.secret, &body, header("x-hub-signature-256")) {
         return (StatusCode::UNAUTHORIZED, "bad signature".into());
     }
     let github_event = header("x-github-event").unwrap_or_default();
@@ -68,7 +67,7 @@ async fn webhook(
         return (StatusCode::BAD_REQUEST, "invalid json".into());
     };
 
-    let report = shared.app.dispatch(github_event, &payload).await;
+    let report = app.dispatch(github_event, &payload).await;
     if !report.errors.is_empty() {
         return (StatusCode::BAD_GATEWAY, report.errors.join("\n"));
     }

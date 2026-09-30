@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use serde_json::Value as Json;
 use tracing::warn;
@@ -15,6 +15,8 @@ use crate::{
 const SEND_TIMEOUT: Duration = Duration::from_secs(8);
 
 pub struct App {
+    pub listen: SocketAddr,
+    pub secret: String,
     routes: Vec<Route>,
 }
 
@@ -33,6 +35,8 @@ pub struct Report {
 impl App {
     pub fn new(config: Config) -> Result<Self> {
         let Config {
+            listen,
+            secret,
             users,
             upstreams,
             events,
@@ -65,7 +69,11 @@ impl App {
                 upstreams: targets,
             });
         }
-        Ok(Self { routes })
+        Ok(Self {
+            listen,
+            secret,
+            routes,
+        })
     }
 
     pub async fn dispatch(&self, github_event: &str, payload: &Json) -> Report {
