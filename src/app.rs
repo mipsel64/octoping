@@ -149,6 +149,9 @@ mod tests {
         let mut long = opened.clone();
         long["pull_request"]["body"] = json!("b".repeat(5000));
         assert!(render(&app, "pr_opened", long).ends_with(&format!(">>> {}…", "b".repeat(300))));
+        let mut ready = opened.clone();
+        ready["action"] = json!("ready_for_review");
+        assert!(render(&app, "pr_opened", ready).starts_with("🆕 x marked ready for review"));
         let mut draft = opened;
         draft["pull_request"]["draft"] = json!(true);
         assert_eq!(render(&app, "pr_opened", draft), "");
@@ -190,6 +193,10 @@ mod tests {
         assert_eq!(
             matched(&app, "pull_request", pr("closed", true)),
             ["pr_merged"]
+        );
+        assert_eq!(
+            matched(&app, "pull_request", pr("ready_for_review", false)),
+            ["pr_opened"]
         );
         assert!(matched(&app, "pull_request", pr("closed", false)).is_empty());
         assert!(matched(&app, "push", pr("opened", false)).is_empty());
