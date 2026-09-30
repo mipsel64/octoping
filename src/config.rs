@@ -24,6 +24,10 @@ pub struct Config {
 
 #[derive(Deserialize)]
 pub struct Route {
+    /// `X-GitHub-Event` header value, e.g. `pull_request`.
+    pub event: String,
+    /// MiniJinja expression over the payload; the event fires when it is truthy.
+    pub when: Option<String>,
     pub to: Vec<String>,
     pub template: String,
 }

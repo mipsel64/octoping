@@ -6,7 +6,7 @@ use tracing::warn;
 use crate::{
     config::Config,
     error::{Error, Result},
-    event::{self, Event},
+    event::{Event, Expression},
     template::{MiniJinja, Template},
     upstream::{self, Upstream},
 };
@@ -26,7 +26,7 @@ struct Route {
 
 #[derive(Default)]
 pub struct Report {
-    pub sent: Vec<&'static str>,
+    pub sent: Vec<String>,
     pub errors: Vec<String>,
 }
 
@@ -35,7 +35,7 @@ impl App {
         let Config {
             users,
             upstreams,
-            mut events,
+            events,
             ..
         } = config;
         let http = reqwest::Client::builder().timeout(SEND_TIMEOUT).build()?;
@@ -45,34 +45,25 @@ impl App {
             .collect();
 
         let mut routes = Vec::new();
-        for event in event::builtin() {
-            let Some(route) = events.remove(event.name()) else {
-                continue;
-            };
+        for (name, route) in events {
+            let invalid =
+                |e: &dyn std::fmt::Display| Error::InvalidConfig(format!("event {name}: {e}"));
             let targets = route
                 .to
                 .into_iter()
-                .map(|name| match upstreams.get(&name) {
-                    Some(upstream) => Ok((name, upstream.clone())),
-                    None => Err(Error::InvalidConfig(format!(
-                        "event {}: unknown upstream {name:?}",
-                        event.name()
-                    ))),
+                .map(|upstream| match upstreams.get(&upstream) {
+                    Some(target) => Ok((upstream, target.clone())),
+                    None => Err(invalid(&format!("unknown upstream {upstream:?}"))),
                 })
                 .collect::<Result<_>>()?;
-            let template = MiniJinja::new(route.template)
-                .map_err(|e| Error::InvalidConfig(format!("event {}: {e}", event.name())))?;
+            let template = MiniJinja::new(route.template).map_err(|e| invalid(&e))?;
+            let event = Expression::new(name.clone(), route.event, route.when.as_deref())
+                .map_err(|e| invalid(&e))?;
             routes.push(Route {
-                event,
+                event: Box::new(event),
                 template: Box::new(template),
                 upstreams: targets,
             });
-        }
-        if let Some(name) = events.keys().next() {
-            let known: Vec<_> = event::builtin().iter().map(|e| e.name()).collect();
-            return Err(Error::InvalidConfig(format!(
-                "unknown event {name:?}, expected one of {known:?}"
-            )));
         }
         Ok(Self { routes })
     }
@@ -96,7 +87,7 @@ impl App {
                     report.errors.push(format!("{upstream_name}: {e}"));
                 }
             }
-            report.sent.push(name);
+            report.sent.push(name.to_owned());
         }
         report
     }
@@ -153,10 +144,65 @@ mod tests {
         );
     }
 
+    fn matched<'a>(app: &'a App, github_event: &str, payload: Json) -> Vec<&'a str> {
+        let routes = app
+            .routes
+            .iter()
+            .filter(|r| r.event.github_event() == github_event);
+        let mut names: Vec<_> = routes
+            .filter(|r| r.event.matches(&payload))
+            .map(|r| r.event.name())
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn example_config_matches() {
+        let app = App::new(Config::from_yaml(EXAMPLE).unwrap()).unwrap();
+        let pr = |action, merged| json!({ "action": action, "pull_request": { "merged": merged } });
+        assert_eq!(
+            matched(&app, "pull_request", pr("opened", false)),
+            ["pr_opened"]
+        );
+        assert_eq!(
+            matched(&app, "pull_request", pr("closed", true)),
+            ["pr_merged"]
+        );
+        assert!(matched(&app, "pull_request", pr("closed", false)).is_empty());
+        assert!(matched(&app, "push", pr("opened", false)).is_empty());
+
+        let review = |action, state| json!({ "action": action, "review": { "state": state } });
+        assert_eq!(
+            matched(&app, "pull_request_review", review("submitted", "approved")),
+            ["pr_approved"]
+        );
+        assert!(
+            matched(
+                &app,
+                "pull_request_review",
+                review("submitted", "commented")
+            )
+            .is_empty()
+        );
+        assert!(matched(&app, "pull_request_review", review("dismissed", "approved")).is_empty());
+
+        let push = |r: &str| json!({ "ref": r, "repository": { "default_branch": "main" } });
+        assert_eq!(
+            matched(&app, "push", push("refs/heads/main")),
+            ["push_default"]
+        );
+        assert!(matched(&app, "push", push("refs/heads/feature")).is_empty());
+        assert!(matched(&app, "push", push("refs/tags/main")).is_empty());
+        let mut deleted = push("refs/heads/main");
+        deleted["deleted"] = json!(true);
+        assert!(matched(&app, "push", deleted).is_empty());
+    }
+
     #[test]
     fn rejects_bad_config() {
         let app = |yaml: &str| App::new(Config::from_yaml(yaml).unwrap());
-        assert!(app(&EXAMPLE.replace("pr_opened:", "pr_bogus:")).is_err());
+        assert!(app(&EXAMPLE.replacen("when: ", "when: == ", 1)).is_err());
         assert!(app(&EXAMPLE.replacen("to: [dev]", "to: [nope]", 1)).is_err());
         assert!(app(&EXAMPLE.replacen("{% if not pull_request.draft %}", "{% if %}", 1)).is_err());
     }

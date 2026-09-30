@@ -2,7 +2,7 @@
 
 Forwards GitHub webhooks to Discord, with templated messages and GitHub → Discord user mentions.
 
-Events: `pr_opened`, `pr_approved`, `pr_merged`, `push_default` (push to the default branch). `ping` gets `pong`.
+Events are defined in the config: a name, the GitHub event (`X-GitHub-Event`), an optional MiniJinja `when` expression over the payload, a template and upstreams. The example ships `pr_opened`, `pr_approved`, `pr_merged` and `push_default` (push to the default branch). `ping` gets `pong`.
 
 ## Run
 
