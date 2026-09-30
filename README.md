@@ -22,3 +22,14 @@ Repo or org → Settings → Webhooks → Add webhook:
 
 Failed upstream deliveries return 502, so you can redeliver them from GitHub's webhook page.
 A redelivery resends to every upstream on that event, including ones that already succeeded.
+
+## Docker
+
+```sh
+docker run -p 8080:8080 \
+  -v "$PWD/octoping.toml:/etc/octoping/octoping.toml:ro" \
+  -e GITHUB_WEBHOOK_SECRET=... -e DISCORD_WEBHOOK_URL=... \
+  ghcr.io/<owner>/octoping:main
+```
+
+CI (`.github/workflows/ci.yml`) runs fmt, clippy and tests, then pushes the image to GHCR on `main` (`:main`, `:sha-…`) and on `v*` tags (`:1.2.3`). Pull requests only build it.
