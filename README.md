@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" alt="" width="160"></p>
+
 # octoping
 
 Forwards GitHub webhooks to Discord, with templated messages and GitHub → Discord user mentions.
