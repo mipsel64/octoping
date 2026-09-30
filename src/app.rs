@@ -129,12 +129,16 @@ mod tests {
         let app = App::new(Config::from_yaml(EXAMPLE).unwrap()).unwrap();
         let repo = json!({ "full_name": "o/r", "default_branch": "main" });
         let pr = json!({ "number": 1, "title": "T", "html_url": "u", "draft": false, "user": { "login": "octocat" } });
-        let commits = json!([{ "id": "abcdef123", "url": "c", "message": "fix\n\nbody" }]);
+        let commits = json!([{
+            "id": "abcdef123", "url": "c", "author": { "name": "Octo", "username": "octocat" },
+            "message": "fix\n\nbody\nCo-authored-by: Jane <jane@example.com>",
+        }]);
         let push =
             json!({ "sender": { "login": "octocat" }, "repository": repo, "commits": commits });
         assert_eq!(
             render(&app, "push_default", push.clone()),
-            "📦 <@123456789012345678> pushed to `o/r:main`\n- [`abcdef1`](<c>) fix"
+            "📦 <@123456789012345678> pushed to `o/r:main`\n\
+             - [`abcdef1`](<c>) fix · <@123456789012345678>, Jane"
         );
         let mut empty = push;
         empty["commits"] = json!([]);

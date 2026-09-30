@@ -48,6 +48,7 @@ events:
       🔀 {{ mention(pull_request.merged_by.login) }} merged [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) into `{{ repository.full_name }}:{{ pull_request.base.ref }}` by {{ mention(pull_request.user.login) }}
 
   # GitHub lists at most 20 commits per push; force-pushes can have none.
+  # Each commit shows its author and Co-authored-by trailers (coauthors filter).
   push_default:
     event: push
     when: not deleted and ref == "refs/heads/" ~ repository.default_branch
@@ -55,5 +56,6 @@ events:
     template: |
       {% if commits %}
       📦 {{ mention(sender.login) }} pushed to `{{ repository.full_name }}:{{ repository.default_branch }}`
-      {% for c in commits[:10] %}- [`{{ c.id[:7] }}`](<{{ c.url }}>) {{ c.message | lines | first }}
+      {% for c in commits[:10] %}- [`{{ c.id[:7] }}`](<{{ c.url }}>) {{ c.message | lines | first }} · {{ mention(c.author.username) or c.author.name }}
+      {%- for a in c.message | coauthors %}, {{ mention(a.login) or a.name }}{% endfor %}
       {% endfor %}{% endif %}
