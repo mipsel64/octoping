@@ -41,3 +41,7 @@ docker run -p 8080:8080 \
 ```
 
 CI (`.github/workflows/ci.yml`) runs fmt, clippy and tests, then pushes the image to GHCR on `main` (`:main`, `:sha-…`) and on `v*` tags (`:1.2.3`). Pull requests only build it.
+
+## Releasing
+
+Bump `version` in `Cargo.toml`, merge, then push a matching tag (`git tag -s v0.2.0 && git push origin v0.2.0`). `.github/workflows/release.yml` builds static Linux (amd64, arm64) and macOS binaries and publishes them with checksums as a GitHub release; tags with `-` (e.g. `v0.2.0-rc.1`) become pre-releases. CI pushes the matching image.
