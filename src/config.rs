@@ -29,7 +29,7 @@ pub struct Route {
 }
 
 impl Config {
-    /// Reads YAML from `path`; `OCTOPING__<PATH>` env vars override it, e.g. `OCTOPING__UPSTREAMS__DEV__URL`.
+    /// Reads YAML from `path`; `OCTOPING__<PATH>` env vars override scalar values, e.g. `OCTOPING__UPSTREAMS__DEV__URL`.
     pub fn load(path: &Path) -> Result<Self> {
         let config = Self::from_source(File::from(path).format(FileFormat::Yaml))?;
         if config.secret.is_empty() {

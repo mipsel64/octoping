@@ -11,7 +11,7 @@ cp octoping.example.yaml octoping.yaml
 OCTOPING__SECRET=... OCTOPING__UPSTREAMS__DEV__URL=... cargo run --release -- --config octoping.yaml
 ```
 
-`OCTOPING__<PATH>` env vars override any config value.
+`OCTOPING__<PATH>` env vars override scalar config values (strings, numbers); lists like `to` must be set in the file.
 
 ## GitHub setup
 

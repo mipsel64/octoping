@@ -1,4 +1,4 @@
-# Any value can be overridden with an OCTOPING__<PATH> env var, e.g.
+# Scalar values can be overridden with an OCTOPING__<PATH> env var, e.g.
 # OCTOPING__SECRET and OCTOPING__UPSTREAMS__DEV__URL. Keep secrets there.
 listen: 0.0.0.0:8080
 secret: ""
