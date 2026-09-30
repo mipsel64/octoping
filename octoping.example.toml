@@ -1,0 +1,37 @@
+# ${VAR} is replaced with the environment variable VAR at startup.
+listen = "0.0.0.0:8080"
+secret = "${GITHUB_WEBHOOK_SECRET}"
+
+# GitHub login (case-insensitive) -> platform user id, used by mention(login).
+[users]
+octocat = { discord = "123456789012345678" }
+
+[upstreams.dev]
+type = "discord"
+url = "${DISCORD_WEBHOOK_URL}"
+
+# Templates are MiniJinja, rendered against the raw GitHub payload.
+# The same template is rendered once per upstream, so mention() formats per platform.
+# A template that renders empty skips the message.
+
+[events."pr.opened"]
+to = ["dev"]
+template = """
+{% if not pull_request.draft %}\
+🆕 {{ mention(sender.login) }} opened [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
+{% endif %}"""
+
+[events."pr.approved"]
+to = ["dev"]
+template = """
+✅ {{ mention(review.user.login) }} approved [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) by {{ mention(pull_request.user.login) }}
+"""
+
+# GitHub lists at most 20 commits per push; force-pushes can have none.
+[events."push.default"]
+to = ["dev"]
+template = """
+{% if commits %}\
+📦 {{ mention(sender.login) }} pushed to `{{ repository.full_name }}:{{ repository.default_branch }}`
+{% for c in commits[:10] %}- [`{{ c.id[:7] }}`](<{{ c.url }}>) {{ c.message | lines | first }}
+{% endfor %}{% endif %}"""
