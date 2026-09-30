@@ -2,6 +2,11 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("cannot read config {}: {source}", path.display())]
+    ReadConfig {
+        path: std::path::PathBuf,
+        source: std::io::Error,
+    },
     #[error("cannot load config: {0}")]
     Config(#[from] config::ConfigError),
     #[error("cannot use config: {0}")]

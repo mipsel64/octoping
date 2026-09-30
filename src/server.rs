@@ -4,11 +4,13 @@ use axum::{
     Router,
     body::Bytes,
     extract::{DefaultBodyLimit, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, Request, StatusCode},
     routing::post,
 };
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
+use tower_http::trace::{DefaultOnResponse, TraceLayer};
+use tracing::{Level, Span, info_span};
 
 use crate::app::App;
 
@@ -24,7 +26,29 @@ pub fn router(app: App, secret: String) -> Router {
     Router::new()
         .route("/webhook", post(webhook))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(request_span)
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
         .with_state(Arc::new(Shared { app, secret }))
+}
+
+fn request_span<B>(request: &Request<B>) -> Span {
+    let header = |name| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+    };
+    info_span!(
+        "request",
+        method = %request.method(),
+        path = request.uri().path(),
+        event = header("x-github-event"),
+        delivery = header("x-github-delivery"),
+    )
 }
 
 async fn webhook(

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use serde_json::Value as Json;
+use tracing::warn;
 
 use crate::{
     config::Config,
@@ -91,7 +92,7 @@ impl App {
                     Err(e) => Err(e),
                 };
                 if let Err(e) = result {
-                    eprintln!("{name} -> {upstream_name}: {e}");
+                    warn!(event = name, upstream = upstream_name, "{e}");
                     report.errors.push(format!("{upstream_name}: {e}"));
                 }
             }
@@ -141,12 +142,21 @@ mod tests {
 
         let approved = json!({ "review": { "user": { "login": "x" } }, "pull_request": pr });
         assert!(render(&app, "pr_approved", approved).ends_with("by <@123456789012345678>"));
+
+        let mut merged_pr = pr;
+        merged_pr["merged_by"] = json!({ "login": "x" });
+        merged_pr["base"] = json!({ "ref": "main" });
+        let merged = json!({ "pull_request": merged_pr, "repository": repo });
+        assert_eq!(
+            render(&app, "pr_merged", merged),
+            "🔀 x merged [#1 T](<u>) into `o/r:main` by <@123456789012345678>"
+        );
     }
 
     #[test]
     fn rejects_bad_config() {
         let app = |yaml: &str| App::new(Config::from_yaml(yaml).unwrap());
-        assert!(app(&EXAMPLE.replace("pr_opened:", "pr_merged:")).is_err());
+        assert!(app(&EXAMPLE.replace("pr_opened:", "pr_bogus:")).is_err());
         assert!(app(&EXAMPLE.replacen("to: [dev]", "to: [nope]", 1)).is_err());
         assert!(app(&EXAMPLE.replacen("{% if not pull_request.draft %}", "{% if %}", 1)).is_err());
     }

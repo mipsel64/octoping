@@ -1,7 +1,7 @@
-# Scalar values can be overridden with an OCTOPING__<PATH> env var, e.g.
-# OCTOPING__SECRET and OCTOPING__UPSTREAMS__DEV__URL. Keep secrets there.
+# $VAR / ${VAR} expand from the environment (unset ones stay as is); keep secrets there.
+# Scalar values can also be overridden with OCTOPING__<PATH>, e.g. OCTOPING__LISTEN.
 listen: 0.0.0.0:8080
-secret: ""
+secret: ${GITHUB_WEBHOOK_SECRET}
 
 # GitHub login (case-insensitive) -> platform user id, used by mention(login).
 users:
@@ -11,7 +11,7 @@ users:
 upstreams:
   dev:
     type: discord
-    url: ""
+    url: ${DISCORD_WEBHOOK_URL}
 
 # Templates are MiniJinja, rendered against the raw GitHub payload once per
 # upstream, so mention() uses each upstream's format. Empty output skips the message.
@@ -27,6 +27,11 @@ events:
     to: [dev]
     template: |
       ✅ {{ mention(review.user.login) }} approved [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) by {{ mention(pull_request.user.login) }}
+
+  pr_merged:
+    to: [dev]
+    template: |
+      🔀 {{ mention(pull_request.merged_by.login) }} merged [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) into `{{ repository.full_name }}:{{ pull_request.base.ref }}` by {{ mention(pull_request.user.login) }}
 
   # GitHub lists at most 20 commits per push; force-pushes can have none.
   push_default:

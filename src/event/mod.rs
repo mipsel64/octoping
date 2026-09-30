@@ -1,10 +1,13 @@
 mod pr_approved;
+mod pr_merged;
 mod pr_opened;
 mod push_default;
 
 use serde_json::Value as Json;
 
-pub use self::{pr_approved::PrApproved, pr_opened::PrOpened, push_default::PushDefault};
+pub use self::{
+    pr_approved::PrApproved, pr_merged::PrMerged, pr_opened::PrOpened, push_default::PushDefault,
+};
 
 /// A notification-worthy GitHub webhook delivery.
 pub trait Event: Send + Sync {
@@ -19,6 +22,7 @@ pub fn builtin() -> Vec<Box<dyn Event>> {
     vec![
         Box::new(PrOpened),
         Box::new(PrApproved),
+        Box::new(PrMerged),
         Box::new(PushDefault),
     ]
 }

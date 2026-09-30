@@ -2,16 +2,18 @@
 
 Forwards GitHub webhooks to Discord, with templated messages and GitHub → Discord user mentions.
 
-Events: `pr_opened`, `pr_approved`, `push_default` (push to the default branch). `ping` gets `pong`.
+Events: `pr_opened`, `pr_approved`, `pr_merged`, `push_default` (push to the default branch). `ping` gets `pong`.
 
 ## Run
 
 ```sh
 cp octoping.example.yaml octoping.yaml
-OCTOPING__SECRET=... OCTOPING__UPSTREAMS__DEV__URL=... cargo run --release -- --config octoping.yaml
+GITHUB_WEBHOOK_SECRET=... DISCORD_WEBHOOK_URL=... cargo run --release -- --config octoping.yaml
 ```
 
-`OCTOPING__<PATH>` env vars override scalar config values (strings, numbers); lists like `to` must be set in the file.
+The config file expands `$VAR`/`${VAR}` from the environment before YAML parsing, so values with YAML syntax (`#`, `: `, quotes) need care. `OCTOPING__<PATH>` env vars override scalar config values (strings, numbers); lists like `to` must be set in the file.
+
+Logging: `--log-level`/`RUST_LOG` (default `info`, per-target like `warn,octoping=debug`) and `--log-format`/`LOG_FORMAT` (`compact` default, `full`, `json`, `pretty`). Each request is logged with its GitHub event and delivery id.
 
 ## GitHub setup
 
@@ -19,7 +21,7 @@ Repo or org → Settings → Webhooks → Add webhook:
 
 - Payload URL: `https://<host>/webhook`
 - Content type: `application/json`
-- Secret: same as `OCTOPING__SECRET`
+- Secret: same as `GITHUB_WEBHOOK_SECRET`
 - Events: Pushes, Pull requests, Pull request reviews
 
 Failed upstream deliveries return 502, so you can redeliver them from GitHub's webhook page.
@@ -30,7 +32,7 @@ A redelivery resends to every upstream on that event, including ones that alread
 ```sh
 docker run -p 8080:8080 \
   -v "$PWD/octoping.yaml:/etc/octoping/octoping.yaml:ro" \
-  -e OCTOPING__SECRET=... -e OCTOPING__UPSTREAMS__DEV__URL=... \
+  -e GITHUB_WEBHOOK_SECRET=... -e DISCORD_WEBHOOK_URL=... \
   ghcr.io/<owner>/octoping:main
 ```
 
