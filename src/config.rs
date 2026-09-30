@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, path::Path};
+use std::{collections::HashMap, net::SocketAddr, path::Path, time::Duration};
 
 use config::{Environment, File, FileFormat};
 use serde::Deserialize;
@@ -16,13 +16,19 @@ pub struct Config {
     #[serde(default = "default_listen")]
     pub listen: SocketAddr,
     pub secret: String,
-    /// How often to re-read the config file, in seconds.
-    #[serde(default = "default_reload_secs")]
-    pub reload_secs: u64,
+    #[serde(default)]
+    pub hot_reload: HotReload,
     #[serde(default)]
     pub users: Users,
     pub upstreams: HashMap<String, upstream::Config>,
     pub events: HashMap<String, Route>,
+}
+
+#[derive(Clone, Copy, Default, Deserialize)]
+pub struct HotReload {
+    /// How often to re-read the config file, e.g. `500ms` or `10s`; unset disables hot reload.
+    #[serde(default, with = "humantime_serde")]
+    pub interval: Option<Duration>,
 }
 
 #[derive(Deserialize)]
@@ -58,9 +64,9 @@ impl Config {
                 "secret must be set and not contain `$`".into(),
             ));
         }
-        if self.reload_secs == 0 {
+        if self.hot_reload.interval.is_some_and(|i| i.is_zero()) {
             return Err(Error::InvalidConfig(
-                "reload_secs must be at least 1".into(),
+                "hot_reload.interval must be positive".into(),
             ));
         }
         Ok(())
@@ -79,11 +85,6 @@ impl Config {
     }
 }
 
-// Kubelet refreshes ConfigMap volumes about once a minute, so faster polling rarely helps.
-fn default_reload_secs() -> u64 {
-    10
-}
-
 fn default_listen() -> SocketAddr {
     SocketAddr::from(([0, 0, 0, 0], 8080))
 }
@@ -100,8 +101,11 @@ mod tests {
         assert_eq!(config.secret, format!("{home}-${{OCTOPING_TEST_UNSET}}"));
         assert!(config.validate().is_err());
 
-        let yaml = "secret: s\nreload_secs: 0\nupstreams: {}\nevents: {}\n";
+        let yaml = "secret: s\nhot_reload: { interval: 0s }\nupstreams: {}\nevents: {}\n";
         assert!(Config::parse(yaml).is_err());
-        assert!(Config::parse(&yaml.replace(": 0", ": 1")).is_ok());
+        let config = Config::parse(&yaml.replace("0s", "500ms")).unwrap();
+        assert_eq!(config.hot_reload.interval, Some(Duration::from_millis(500)));
+        let config = Config::parse(&yaml.replace("hot_reload: { interval: 0s }\n", "")).unwrap();
+        assert_eq!(config.hot_reload.interval, None);
     }
 }

@@ -7,15 +7,21 @@ use tracing::{info, warn};
 
 use crate::{app::App, config::Config, error::Result, server::Shared};
 
-/// Re-reads the config file every `reload_secs` and swaps in a new app when its content changes.
+/// Re-reads the config file every `hot_reload.interval` and swaps in a new app when its content
+/// changes; stops once the interval is unset.
 // Polling, not a file watcher: k8s swaps ConfigMap volumes via a `..data` symlink, which watchers easily miss.
 pub async fn watch(path: PathBuf, mut last: String, shared: Arc<Shared>) {
     loop {
-        let every = shared
+        let interval = shared
             .read()
             .unwrap_or_else(|e| e.into_inner())
-            .reload_every;
-        tokio::time::sleep(every).await;
+            .hot_reload
+            .interval;
+        let Some(interval) = interval else {
+            info!("hot reload disabled; restart to re-enable");
+            return;
+        };
+        tokio::time::sleep(interval).await;
         reload(&path, &mut last, &shared);
     }
 }

@@ -4,7 +4,7 @@ use serde_json::Value as Json;
 use tracing::warn;
 
 use crate::{
-    config::Config,
+    config::{Config, HotReload},
     error::{Error, Result},
     event::{Event, Expression},
     template::{MiniJinja, Template},
@@ -17,7 +17,7 @@ const SEND_TIMEOUT: Duration = Duration::from_secs(8);
 pub struct App {
     pub listen: SocketAddr,
     pub secret: String,
-    pub reload_every: Duration,
+    pub hot_reload: HotReload,
     routes: Vec<Route>,
 }
 
@@ -38,7 +38,7 @@ impl App {
         let Config {
             listen,
             secret,
-            reload_secs,
+            hot_reload,
             users,
             upstreams,
             events,
@@ -74,7 +74,7 @@ impl App {
         Ok(Self {
             listen,
             secret,
-            reload_every: Duration::from_secs(reload_secs),
+            hot_reload,
             routes,
         })
     }
