@@ -27,11 +27,11 @@ upstreams:
 events:
   pr_opened:
     event: pull_request
-    when: action == "opened"
+    when: action in ["opened", "ready_for_review"]
     to: [dev]
     template: |
       {% if not pull_request.draft %}
-      🆕 {{ mention(sender.login) }} opened [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
+      🆕 {{ mention(sender.login) }} {{ "marked ready for review" if action == "ready_for_review" else "opened" }} [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
       {% if pull_request.body %}>>> {{ pull_request.body[:300] }}{% if pull_request.body | length > 300 %}…{% endif %}{% endif %}
       {% endif %}
 
