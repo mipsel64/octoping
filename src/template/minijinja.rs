@@ -24,11 +24,16 @@ impl MiniJinja {
 impl Template for MiniJinja {
     fn render(&self, payload: &Json, mention: Arc<dyn Mention>) -> Result<String> {
         // Option: a null or missing login renders as nothing instead of failing the delivery forever.
+        let team = mention.clone();
         let mention = Value::from_function(move |login: Option<&str>| match login {
             Some(login) => mention.mention(login).unwrap_or_else(|| login.to_owned()),
             None => String::new(),
         });
-        let ctx = context! { mention, ..Value::from_serialize(payload) };
+        let mention_team = Value::from_function(move |slug: Option<&str>| match slug {
+            Some(slug) => team.mention_team(slug).unwrap_or_else(|| slug.to_owned()),
+            None => String::new(),
+        });
+        let ctx = context! { mention, mention_team, ..Value::from_serialize(payload) };
         let text = self.env.get_template(NAME)?.render(ctx)?;
         Ok(text.trim().to_owned())
     }
@@ -68,6 +73,10 @@ mod tests {
         fn mention(&self, login: &str) -> Option<String> {
             (login == "octocat").then(|| "@octo".into())
         }
+
+        fn mention_team(&self, slug: &str) -> Option<String> {
+            (slug == "backend").then(|| "@team".into())
+        }
     }
 
     #[test]
@@ -80,6 +89,19 @@ mod tests {
         assert_eq!(
             template.render(&payload, Arc::new(Test)).unwrap(),
             "@octo ghost #7"
+        );
+    }
+
+    #[test]
+    fn renders_team_mentions() {
+        let template = MiniJinja::new(
+            "{{ mention_team(a) }} {{ mention_team(b) }}{{ mention_team(missing) }}".into(),
+        )
+        .unwrap();
+        let payload = json!({ "a": "backend", "b": "ops" });
+        assert_eq!(
+            template.render(&payload, Arc::new(Test)).unwrap(),
+            "@team ops"
         );
     }
 

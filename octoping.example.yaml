@@ -11,12 +11,19 @@ users:
   octocat:
     discord: "123456789012345678"
 
+# GitHub team slug (case-insensitive) -> platform role id, used by mention_team(slug).
+teams:
+  reviewers:
+    discord: "234567890123456789"
+
 upstreams:
   dev:
     type: discord
     url: ${DISCORD_WEBHOOK_URL}
     # Discord ids are per account, not per server. For someone using another account on this
     # server, add e.g. `discord-work: "..."` under their login and set `users_key: discord-work`.
+    # Discord role ids are per server. For a server other than the one under `discord`, add
+    # e.g. `discord-ops: "..."` under each team and set `teams_key: discord-ops`.
 
 # Each event fires on deliveries whose X-GitHub-Event header equals `event` and
 # whose payload makes the optional `when` MiniJinja expression truthy.
@@ -34,6 +41,14 @@ events:
       🆕 {{ mention(sender.login) }} {{ "marked ready for review" if action == "ready_for_review" else "opened" }} [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
       {% if pull_request.body %}>>> {{ pull_request.body[:300] }}{% if pull_request.body | length > 300 %}…{% endif %}{% endif %}
       {% endif %}
+
+  # One delivery per requested reviewer: a user (requested_reviewer) or a team (requested_team).
+  pr_review_requested:
+    event: pull_request
+    when: action == "review_requested"
+    to: [dev]
+    template: |
+      👀 {{ mention(sender.login) }} requested a review from {{ mention_team(requested_team.slug) if requested_team else mention(requested_reviewer.login) }} on [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
 
   pr_approved:
     event: pull_request_review

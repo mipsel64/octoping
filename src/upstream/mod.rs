@@ -6,7 +6,11 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 pub use self::discord::Discord;
-use crate::{config::Users, error::Result, template::Mention};
+use crate::{
+    config::{Teams, Users},
+    error::Result,
+    template::Mention,
+};
 
 /// A chat or delivery backend that receives rendered messages, mentioning users in its own format.
 #[async_trait]
@@ -42,29 +46,42 @@ pub enum Config {
     Discord(discord::Config),
 }
 
-pub fn build(config: Config, users: &Users, http: reqwest::Client) -> Arc<dyn Upstream> {
+pub fn build(
+    config: Config,
+    users: &Users,
+    teams: &Teams,
+    http: reqwest::Client,
+) -> Arc<dyn Upstream> {
     match config {
         Config::Discord(config) => {
-            let ids = ids(users, config.users_key.as_deref(), "discord");
-            Arc::new(Discord::new(config, ids, http))
+            let user_ids = ids(users, config.users_key.as_deref(), "discord");
+            let roles = ids(teams, config.teams_key.as_deref(), "discord");
+            Arc::new(Discord::new(config, user_ids, roles, http))
         }
     }
 }
 
-/// Lowercased GitHub login -> user id under `key`, else under `platform`.
-fn ids(users: &Users, key: Option<&str>, platform: &str) -> HashMap<String, String> {
-    users
+/// Lowercased GitHub login or team slug -> id under `key`, else under `platform`.
+fn ids(
+    names: &HashMap<String, HashMap<String, String>>,
+    key: Option<&str>,
+    platform: &str,
+) -> HashMap<String, String> {
+    names
         .iter()
-        .filter_map(|(login, ids)| {
+        .filter_map(|(name, ids)| {
             let id = key.and_then(|k| ids.get(k)).or_else(|| ids.get(platform))?;
-            Some((login.to_lowercase(), id.clone()))
+            Some((name.to_lowercase(), id.clone()))
         })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+    use crate::config::Teams;
 
     #[test]
     fn ids_prefer_users_key() {
@@ -90,6 +107,32 @@ mod tests {
         let pair = |l: &str, i: &str| (l.to_owned(), i.to_owned());
         assert_eq!(pairs(None), [pair("alice", "1"), pair("bob", "2")]);
         assert_eq!(pairs(Some("work")), [pair("alice", "9"), pair("bob", "2")]);
+    }
+
+    #[test]
+    fn build_prefers_teams_key() {
+        let teams: Teams = HashMap::from([
+            (
+                "Reviewers".into(),
+                HashMap::from([
+                    ("discord".into(), "1".into()),
+                    ("discord-ops".into(), "9".into()),
+                ]),
+            ),
+            ("qa".into(), HashMap::from([("discord".into(), "2".into())])),
+            (
+                "sales".into(),
+                HashMap::from([("slack".into(), "3".into())]),
+            ),
+        ]);
+        let config = serde_json::from_value::<Config>(
+            json!({ "type": "discord", "url": "", "teams_key": "discord-ops" }),
+        )
+        .unwrap();
+        let upstream = build(config, &Users::new(), &teams, reqwest::Client::new());
+        assert_eq!(upstream.mention_team("reviewers").as_deref(), Some("<@&9>"));
+        assert_eq!(upstream.mention_team("QA").as_deref(), Some("<@&2>"));
+        assert_eq!(upstream.mention_team("sales"), None);
     }
 
     #[test]
