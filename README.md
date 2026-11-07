@@ -4,7 +4,9 @@
 
 Forwards GitHub webhooks to Discord, with templated messages and GitHub → Discord user mentions.
 
-Events are defined in the config: a name, the GitHub event (`X-GitHub-Event`), an optional MiniJinja `when` expression over the payload, a template and upstreams. The example ships `pr_opened`, `pr_approved`, `pr_merged` and `push_default` (push to the default branch). `ping` gets `pong`.
+Events are defined in the config: a name, the GitHub event (`X-GitHub-Event`), an optional MiniJinja `when` expression over the payload, a template and upstreams. The example ships `pr_opened`, `pr_review_requested`, `pr_approved`, `pr_merged` and `push_default` (push to the default branch). `ping` gets `pong`.
+
+Templates mention people with `mention(login)` (ids from `users`) and teams with `mention_team(slug)` (role ids from `teams`, keyed by team slug). Discord role ids are per server: for an upstream on another server, add its ids under a new key in each team and set that upstream's `teams_key` (it falls back to `discord`). If a role does not ping, enable "Allow anyone to @mention this role" on it.
 
 ## Run
 

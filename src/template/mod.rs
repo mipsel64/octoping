@@ -11,6 +11,8 @@ use crate::error::Result;
 pub trait Mention: Send + Sync {
     /// `None` when the login isn't mapped on this platform.
     fn mention(&self, login: &str) -> Option<String>;
+    /// `None` when the team slug isn't mapped on this platform.
+    fn mention_team(&self, slug: &str) -> Option<String>;
 }
 
 /// A message template, rendered once per upstream so mentions use that upstream's format.

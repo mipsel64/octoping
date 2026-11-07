@@ -40,6 +40,7 @@ impl App {
             secret,
             hot_reload,
             users,
+            teams,
             upstreams,
             events,
             ..
@@ -47,7 +48,7 @@ impl App {
         let http = reqwest::Client::builder().timeout(SEND_TIMEOUT).build()?;
         let upstreams: HashMap<_, _> = upstreams
             .into_iter()
-            .map(|(name, config)| (name, upstream::build(config, &users, http.clone())))
+            .map(|(name, config)| (name, upstream::build(config, &users, &teams, http.clone())))
             .collect();
 
         let mut routes = Vec::new();
@@ -159,13 +160,45 @@ mod tests {
         let approved = json!({ "review": { "user": { "login": "x" } }, "pull_request": pr });
         assert!(render(&app, "pr_approved", approved).ends_with("by <@123456789012345678>"));
 
-        let mut merged_pr = pr;
+        let mut merged_pr = pr.clone();
         merged_pr["merged_by"] = json!({ "login": "x" });
         merged_pr["base"] = json!({ "ref": "main" });
         let merged = json!({ "pull_request": merged_pr, "repository": repo });
         assert_eq!(
             render(&app, "pr_merged", merged),
             "🔀 x merged [#1 T](<u>) into `o/r:main` by <@123456789012345678>"
+        );
+
+        let request = |extra: Json| {
+            let mut p = json!({ "action": "review_requested", "sender": { "login": "x" }, "pull_request": pr, "repository": repo });
+            p.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            p
+        };
+        assert_eq!(
+            render(
+                &app,
+                "pr_review_requested",
+                request(json!({ "requested_reviewer": { "login": "octocat" } }))
+            ),
+            "👀 x requested a review from <@123456789012345678> on [#1 T](<u>) in `o/r`"
+        );
+        assert_eq!(
+            render(
+                &app,
+                "pr_review_requested",
+                request(json!({ "requested_team": { "slug": "reviewers" } }))
+            ),
+            "👀 x requested a review from <@&234567890123456789> on [#1 T](<u>) in `o/r`"
+        );
+        assert_eq!(
+            render(
+                &app,
+                "pr_review_requested",
+                request(json!({ "requested_team": { "slug": "ops" } }))
+            ),
+            "👀 x requested a review from ops on [#1 T](<u>) in `o/r`"
         );
     }
 
@@ -198,6 +231,11 @@ mod tests {
             matched(&app, "pull_request", pr("ready_for_review", false)),
             ["pr_opened"]
         );
+        assert_eq!(
+            matched(&app, "pull_request", pr("review_requested", false)),
+            ["pr_review_requested"]
+        );
+        assert!(matched(&app, "pull_request", pr("review_request_removed", false)).is_empty());
         assert!(matched(&app, "pull_request", pr("closed", false)).is_empty());
         assert!(matched(&app, "push", pr("opened", false)).is_empty());
 

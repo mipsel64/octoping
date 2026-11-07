@@ -11,6 +11,9 @@ use crate::{
 /// GitHub login -> platform (e.g. `discord`) -> user id on that platform.
 pub type Users = HashMap<String, HashMap<String, String>>;
 
+/// GitHub team slug -> platform (e.g. `discord`) -> role id on that platform.
+pub type Teams = HashMap<String, HashMap<String, String>>;
+
 #[derive(Deserialize)]
 pub struct Config {
     #[serde(default = "default_listen")]
@@ -20,6 +23,8 @@ pub struct Config {
     pub hot_reload: HotReload,
     #[serde(default)]
     pub users: Users,
+    #[serde(default)]
+    pub teams: Teams,
     pub upstreams: HashMap<String, upstream::Config>,
     pub events: HashMap<String, Route>,
 }
