@@ -163,10 +163,15 @@ mod tests {
         let mut merged_pr = pr.clone();
         merged_pr["merged_by"] = json!({ "login": "x" });
         merged_pr["base"] = json!({ "ref": "main" });
-        let merged = json!({ "pull_request": merged_pr, "repository": repo });
+        let mut merged = json!({ "pull_request": merged_pr, "repository": repo });
+        assert_eq!(
+            render(&app, "pr_merged", merged.clone()),
+            "🔀 x merged [#1 T](<u>) into `o/r:main` by <@123456789012345678>"
+        );
+        merged["pull_request"]["merged_by"]["login"] = json!("octocat");
         assert_eq!(
             render(&app, "pr_merged", merged),
-            "🔀 x merged [#1 T](<u>) into `o/r:main` by <@123456789012345678>"
+            "🔀 <@123456789012345678> merged [#1 T](<u>) into `o/r:main`"
         );
 
         let request = |extra: Json| {

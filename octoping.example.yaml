@@ -62,7 +62,7 @@ events:
     when: action == "closed" and pull_request.merged
     to: [dev]
     template: |
-      🔀 {{ mention(pull_request.merged_by.login) }} merged [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) into `{{ repository.full_name }}:{{ pull_request.base.ref }}` by {{ mention(pull_request.user.login) }}
+      🔀 {{ mention(pull_request.merged_by.login) }} merged [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) into `{{ repository.full_name }}:{{ pull_request.base.ref }}`{% if pull_request.merged_by.login != pull_request.user.login %} by {{ mention(pull_request.user.login) }}{% endif %}
 
   # GitHub lists at most 20 commits per push; force-pushes can have none.
   # Each commit shows its author and Co-authored-by trailers (coauthors filter).
