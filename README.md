@@ -42,7 +42,7 @@ docker run -p 8080:8080 \
   ghcr.io/<owner>/octoping:main
 ```
 
-CI (`.github/workflows/ci.yml`) runs fmt, clippy and tests, then pushes a multi-platform (amd64, arm64) image to GHCR on `main` (`:main`, `:sha-…`). Pull requests only build it.
+CI (`.github/workflows/ci.yml`) runs fmt, clippy, tests and a RustSec audit of `Cargo.lock`, then pushes a multi-platform (amd64, arm64) image to GHCR on `main` (`:main`, `:sha-…`). Pull requests only build it. The audit also runs daily.
 
 ## Releasing
 
