@@ -407,6 +407,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "eclap"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fe00110b0e67bd211a1e2fbdbcbed2fc9aa4593122e4769d1e0c65b80d43c9b"
+dependencies = [
+ "clap",
+ "eclap-derive",
+]
+
+[[package]]
+name = "eclap-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1aec2d2eb69247d03ff1babb63fa4d99fb1c3cb45c0f3da917711278d99090f"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -984,8 +1006,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
- "clap",
  "config",
+ "eclap",
  "hex",
  "hmac",
  "humantime-serde",

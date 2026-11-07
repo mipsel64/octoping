@@ -10,7 +10,6 @@ mod upstream;
 
 use std::{path::PathBuf, process::ExitCode};
 
-use clap::Parser;
 use tokio::{
     net::TcpListener,
     signal::unix::{SignalKind, signal},
@@ -20,14 +19,14 @@ use tracing::info;
 use crate::{app::App, config::Config, error::Result};
 
 /// Forward GitHub webhooks to chat upstreams with templated messages and user mentions.
-#[derive(Parser)]
-#[command(version, about)]
+#[derive(eclap::Parser)]
+#[command(version)]
 struct Cli {
     /// Path to the YAML config file.
     #[arg(short, long, env = "OCTOPING_CONFIG", default_value = "octoping.yaml")]
     config: PathBuf,
 
-    #[command(flatten)]
+    #[eclap(ns = "")]
     log: logger::Config,
 }
 
@@ -71,7 +70,7 @@ async fn run(cli: Cli) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use clap::CommandFactory;
+    use eclap::clap::CommandFactory;
 
     use super::*;
 

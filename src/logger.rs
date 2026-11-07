@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use clap::{Args, ValueEnum};
+use eclap::clap::{self, ValueEnum};
 use tracing_subscriber::{filter::Targets, layer::SubscriberExt, util::SubscriberInitExt};
 
-#[derive(Args)]
+#[derive(eclap::Args)]
 pub struct Config {
     /// Log filter, e.g. `info` or `warn,octoping=debug`.
     #[arg(long, short, env = "RUST_LOG", default_value = "info", value_parser = Targets::from_str)]
