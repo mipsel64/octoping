@@ -153,6 +153,25 @@ mod tests {
         let mut ready = opened.clone();
         ready["action"] = json!("ready_for_review");
         assert!(render(&app, "pr_opened", ready).starts_with("🆕 x marked ready for review"));
+        let reviewers = json!({
+            "requested_teams": [{ "slug": "reviewers" }, { "slug": "ops" }],
+            "requested_reviewers": [{ "login": "octocat" }],
+        });
+        let mut with_reviewers = opened.clone();
+        with_reviewers["action"] = json!("opened");
+        with_reviewers["pull_request"]
+            .as_object_mut()
+            .unwrap()
+            .extend(reviewers.as_object().unwrap().clone());
+        assert_eq!(
+            render(&app, "pr_opened", with_reviewers.clone()),
+            "🆕 x opened [#1 T](<u>) in `o/r` · review: <@&234567890123456789> ops <@123456789012345678>"
+        );
+        with_reviewers["action"] = json!("ready_for_review");
+        assert_eq!(
+            render(&app, "pr_opened", with_reviewers),
+            "🆕 x marked ready for review [#1 T](<u>) in `o/r`"
+        );
         let mut draft = opened;
         draft["pull_request"]["draft"] = json!(true);
         assert_eq!(render(&app, "pr_opened", draft), "");
@@ -174,18 +193,24 @@ mod tests {
             "🔀 <@123456789012345678> merged [#1 T](<u>) into `o/r:main`"
         );
 
-        let request = |extra: Json| {
+        let request = |updated_at: &str, extra: Json| {
             let mut p = json!({ "action": "review_requested", "sender": { "login": "x" }, "pull_request": pr, "repository": repo });
+            p["pull_request"]["created_at"] = json!("2026-11-09T03:48:57Z");
+            p["pull_request"]["updated_at"] = json!(updated_at);
             p.as_object_mut()
                 .unwrap()
                 .extend(extra.as_object().unwrap().clone());
             p
         };
+        let later = "2026-11-09T07:00:00Z";
         assert_eq!(
             render(
                 &app,
                 "pr_review_requested",
-                request(json!({ "requested_reviewer": { "login": "octocat" } }))
+                request(
+                    later,
+                    json!({ "requested_reviewer": { "login": "octocat" } })
+                )
             ),
             "👀 x requested a review from <@123456789012345678> on [#1 T](<u>) in `o/r`"
         );
@@ -193,7 +218,7 @@ mod tests {
             render(
                 &app,
                 "pr_review_requested",
-                request(json!({ "requested_team": { "slug": "reviewers" } }))
+                request(later, json!({ "requested_team": { "slug": "reviewers" } }))
             ),
             "👀 x requested a review from <@&234567890123456789> on [#1 T](<u>) in `o/r`"
         );
@@ -201,9 +226,21 @@ mod tests {
             render(
                 &app,
                 "pr_review_requested",
-                request(json!({ "requested_team": { "slug": "ops" } }))
+                request(later, json!({ "requested_team": { "slug": "ops" } }))
             ),
             "👀 x requested a review from ops on [#1 T](<u>) in `o/r`"
+        );
+        // CODEOWNERS requests arrive with the opening, which the opened message already lists.
+        assert_eq!(
+            render(
+                &app,
+                "pr_review_requested",
+                request(
+                    "2026-11-09T03:48:58Z",
+                    json!({ "requested_team": { "slug": "reviewers" } })
+                )
+            ),
+            ""
         );
     }
 
