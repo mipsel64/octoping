@@ -36,19 +36,26 @@ events:
     event: pull_request
     when: action in ["opened", "ready_for_review"]
     to: [dev]
+    # Reviewers requested as the PR opens (CODEOWNERS) are in this payload.
     template: |
       {% if not pull_request.draft %}
       🆕 {{ mention(sender.login) }} {{ "marked ready for review" if action == "ready_for_review" else "opened" }} [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
+      {%- if action == "opened" and (pull_request.requested_teams or pull_request.requested_reviewers) %} · review:
+      {%- for t in pull_request.requested_teams %} {{ mention_team(t.slug) }}{% endfor %}
+      {%- for u in pull_request.requested_reviewers %} {{ mention(u.login) }}{% endfor %}{% endif %}
       {% if pull_request.body %}>>> {{ pull_request.body[:300] }}{% if pull_request.body | length > 300 %}…{% endif %}{% endif %}
       {% endif %}
 
   # One delivery per requested reviewer: a user (requested_reviewer) or a team (requested_team).
+  # Requests made as the PR opens are skipped: pr_opened lists them, and GitHub can drop these.
   pr_review_requested:
     event: pull_request
     when: action == "review_requested"
     to: [dev]
     template: |
+      {% if (pull_request.updated_at | timestamp) - (pull_request.created_at | timestamp) > 10 %}
       👀 {{ mention(sender.login) }} requested a review from {{ mention_team(requested_team.slug) if requested_team else mention(requested_reviewer.login) }} on [#{{ pull_request.number }} {{ pull_request.title }}](<{{ pull_request.html_url }}>) in `{{ repository.full_name }}`
+      {% endif %}
 
   pr_approved:
     event: pull_request_review

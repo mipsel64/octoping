@@ -8,6 +8,8 @@ Events are defined in the config: a name, the GitHub event (`X-GitHub-Event`), a
 
 Templates mention people with `mention(login)` (ids from `users`) and teams with `mention_team(slug)` (role ids from `teams`, keyed by team slug). Discord role ids are per server: for an upstream on another server, add its ids under a new key in each team and set that upstream's `teams_key` (it falls back to `discord`). If a role does not ping, enable "Allow anyone to @mention this role" on it.
 
+Reviewers that CODEOWNERS requests as a PR opens are in the `opened` payload (`pull_request.requested_teams`, `requested_reviewers`), and the example `pr_opened` message lists them. GitHub usually also sends a `review_requested` delivery for each of them, but not always, so the example `pr_review_requested` skips requests made within 10 s of the PR's creation. The `timestamp` filter turns a GitHub time into Unix seconds for this check.
+
 ## Run
 
 ```sh

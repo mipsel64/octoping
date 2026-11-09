@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::UNIX_EPOCH};
 
-use minijinja::{Environment, Value, context};
+use minijinja::{Environment, ErrorKind, Value, context};
 use serde_json::Value as Json;
 
 use super::{Mention, Template};
@@ -16,6 +16,7 @@ impl MiniJinja {
     pub fn new(source: String) -> Result<Self> {
         let mut env = Environment::new();
         env.add_filter("coauthors", coauthors);
+        env.add_filter("timestamp", timestamp);
         env.add_template_owned(NAME, source)?;
         Ok(Self { env })
     }
@@ -59,6 +60,17 @@ fn coauthors(message: &str) -> Vec<Value> {
             Some(context! { name => name.trim(), login })
         })
         .collect()
+}
+
+/// An RFC 3339 time such as GitHub's `created_at`, as Unix seconds.
+fn timestamp(value: &str) -> std::result::Result<i64, minijinja::Error> {
+    let time = humantime::parse_rfc3339(value).map_err(|e| {
+        minijinja::Error::new(ErrorKind::InvalidOperation, format!("{value:?}: {e}"))
+    })?;
+    Ok(time
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64)
 }
 
 #[cfg(test)]
@@ -118,6 +130,21 @@ mod tests {
             template.render(&json!({ "m": m }), Arc::new(Test)).unwrap(),
             "@octo;ghost;Jane Doe;"
         );
+    }
+
+    #[test]
+    fn timestamp_gives_unix_seconds() {
+        let template = MiniJinja::new("{{ (b | timestamp) - (a | timestamp) }}".into()).unwrap();
+        let render = |a: &str, b: &str| template.render(&json!({ "a": a, "b": b }), Arc::new(Test));
+        assert_eq!(
+            render("2026-11-09T03:48:57Z", "2026-11-09T03:48:58Z").unwrap(),
+            "1"
+        );
+        assert_eq!(
+            render("2026-11-08T23:59:59Z", "2026-11-09T00:00:01Z").unwrap(),
+            "2"
+        );
+        assert!(render("yesterday", "2026-11-09T00:00:01Z").is_err());
     }
 
     #[test]

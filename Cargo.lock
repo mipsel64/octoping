@@ -1002,7 +1002,7 @@ dependencies = [
 
 [[package]]
 name = "octoping"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -1010,6 +1010,7 @@ dependencies = [
  "eclap",
  "hex",
  "hmac",
+ "humantime",
  "humantime-serde",
  "minijinja",
  "reqwest",
